@@ -1,18 +1,26 @@
-import { Controller, Post, Body } from "@nestjs/common";
+import { Controller, Post, Body, Param } from "@nestjs/common";
 import { PullRequestPayload } from "./models/PullRequestPayload";
 import { SlackService } from "./slack.service";
+import { ConfigService } from "./config/config.service";
 
-const applicable_branches = ["develop", "release", "master"];
-
-@Controller("/deploy")
+@Controller("deploy")
 export class AppController {
-  constructor(private readonly slackService: SlackService) {}
+  constructor(
+    private readonly slackService: SlackService,
+    private readonly configService: ConfigService,
+  ) {}
 
-  @Post()
-  async acceptPullRequestHook(@Body() payload: PullRequestPayload): Promise<object> {
+  @Post("/:pass")
+  async acceptPullRequestHook(
+    @Body() payload: PullRequestPayload,
+    @Param("pass") pass: string,
+  ): Promise<object> {
     const branch_name = payload.pullrequest.destination.branch.name.toLowerCase();
 
-    if (applicable_branches.includes(branch_name)) {
+    const applicable_branch = this.configService.get("BRANCH");
+    const password = this.configService.get("PASS");
+
+    if (applicable_branch === branch_name && password === pass) {
       // notify pull request received
       const response = this.slackService.generateNotifyPullRequestReceivedMessage(payload);
       await this.slackService.sendSlackNotification(response);
